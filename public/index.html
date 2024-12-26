@@ -4,18 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hello World</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <h1>Hello World</h1>
-    <p>Current CEST Time: <span id="time">Loading...</span></p>
+    <label for="timezone">Choose a time zone:</label>
+    <select id="timezone">
+        <option value="Europe/Paris">Central European Summer Time (CEST)</option>
+        <option value="America/New_York">Eastern Time (ET)</option>
+        <option value="Asia/Tokyo">Japan Standard Time (JST)</option>
+        <!-- Add more time zones as needed -->
+    </select>
+    <p>Current Time: <span id="time">Loading...</span></p>
+    <hr>
+    <label for="fileUpload">Upload a text file:</label>
+    <input type="file" id="fileUpload" accept=".txt">
+    <pre id="fileContent"></pre>
+    <hr>
+    <label for="messageInput">Send a message:</label>
+    <input type="text" id="messageInput">
+    <button id="sendMessageButton">Send</button>
+    <pre id="logMessages"></pre>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        fetch('/time')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('time').innerText = data.time;
-            })
-            .catch(error => console.error('Error fetching time:', error));
+        const socket = io();
+
+        const timezoneSelect = document.getElementById('timezone');
+        const fileUpload = document.getElementById('fileUpload');
+        const fileContent = document.getElementById('fileContent');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageButton = document.getElementById('sendMessageButton');
+        const logMessages = document.getElementById('logMessages');
+
+        function fetchTime(timezone) {
+            fetch(`/time?timezone=${encodeURIComponent(timezone)}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('time').innerText = data.time;
+                })
+                .catch(error => console.error('Error fetching time:', error));
+        }
+
+        timezoneSelect.addEventListener('change', () => {
+            const selectedTimezone = timezoneSelect.value;
+            fetchTime(selectedTimezone);
+        });
+
+        // Fetch time for the initial selected timezone
+        fetchTime(timezoneSelect.value);
+
+        // Handle file upload
+        fileUpload.addEventListener('change', () => {
+            const file = fileUpload.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    socket.emit('uploadFile', content);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Display processed file content
+        socket.on('fileProcessed', (capitalizedContent) => {
+            fileContent.innerText = capitalizedContent;
+        });
+
+        // Handle sending messages
+        sendMessageButton.addEventListener('click', () => {
+            const message = messageInput.value;
+            if (message) {
+                socket.emit('sendMessage', message);
+                logMessages.innerText += `${new Date().toISOString()}: ${message}\n`;
+                messageInput.value = '';
+            }
+        });
     </script>
 </body>
 </html>
